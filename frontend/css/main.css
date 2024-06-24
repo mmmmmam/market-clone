@@ -1,9 +1,9 @@
 main {
-  padding: 20px;
+  padding: 30px 20px 100px 20px;
 }
 .item-list {
   display: flex;
-  justify-content: space-evenly;
+  justify-content: flex-start;
   align-items: center;
   border-bottom: 1px solid #ededef;
   padding: 10px 0 10px 0;
@@ -34,9 +34,11 @@ main {
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
 }
 .item-list__img img {
-  width: 50px;
+  width: 100%;
+  height: 100%;
 }
 .write-btn {
   background-color: var(--button-primary);
@@ -50,6 +52,7 @@ main {
   box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 29px 0px;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
+  text-decoration: none;
 }
 .write-btn:hover {
   background-color: var(--button-hover);
