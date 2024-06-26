@@ -58,4 +58,17 @@ def get_image(item_id):
     image_bytes = cur.execute(f"""SELECT image FROM items WHERE id={item_id}""").fetchone()[0]
     return Response(content=bytes.fromhex(image_bytes))
 
+#회원가입
+@app.post("/signup")
+def signup(id:Annotated[str,Form()],
+           password:Annotated[str,Form()],
+           name:Annotated[str,Form()],
+           phone:Annotated[str,Form()]):
+    cur.execute(f"""
+                INSERT INTO users(id,password,name,phone)
+                VALUES ('{id}','{password}','{name}','{phone}')
+                """)
+    con.commit()
+    return '200'
+
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
