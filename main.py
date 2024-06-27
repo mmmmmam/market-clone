@@ -1,7 +1,9 @@
-from fastapi import FastAPI, UploadFile, Form, Response # Form 데이터는 "python-multipart"가 필요하기 때문에 설치해줘야 함
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, UploadFile, Form, Response, Depends# Form 데이터는 "python-multipart"가 필요하기 때문에 설치해줘야 함
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.staticfiles import StaticFiles
+from fastapi_login import LoginManager #로그인
+from fastapi_login.exceptions import InvalidCredentialsException #오류출력
 from typing_extensions import Annotated
 import sqlite3
 
@@ -10,6 +12,61 @@ cur=con.cursor()
 
 app = FastAPI()
 
+SECRET = "super-coding" #decoding JWT해석
+manager = LoginManager(SECRET, 'login')
+
+@manager.user_loader()
+def query_user(data):
+    WHERE_STATEMENTS = f'''id="{data}"'''
+    if type(data) == dict:
+        WHERE_STATEMENTS = f'''id="{data['id']}"'''
+    
+    # 컬럼명도 같이 가져옴
+    con.row_factory=sqlite3.Row
+    
+    cur = con.cursor()
+    user = cur.execute(f"""
+                       SELECT * FROM users WHERE {WHERE_STATEMENTS}
+                       """).fetchone()
+    return user
+
+#회원가입
+@app.post("/signup")
+def signup(id:Annotated[str,Form()],
+           password:Annotated[str,Form()],
+           name:Annotated[str,Form()],
+           phone:Annotated[str,Form()]):
+    cur.execute(f"""
+                INSERT INTO users(id,password,name,phone)
+                VALUES ('{id}','{password}','{name}','{phone}')
+                """)
+    con.commit()
+    return '200'
+
+#로그인
+@app.post('/login')
+def login (id:Annotated[str,Form()], password:Annotated[str,Form()]):
+    # 컬럼명도 같이 가져옴
+    con.row_factory=sqlite3.Row
+    user = query_user(id)
+    #유저가 없는 경우
+    if not user:
+        raise InvalidCredentialsException
+    #입력된 비밀번호와 DB에 저장된 비밀번호 일치 확인
+    elif password != user['password']:
+        raise InvalidCredentialsException
+    
+    #Access Token
+    access_token = manager.create_access_token(data={
+        'sub':{'id':user['id'],
+        'name':user['name'],
+        'phone':user['phone']
+        }
+    })
+    
+    return {'access_token':access_token}
+
+#글쓰기
 @app.post('/items')
 #image는 UploadFile 형식, title은 form 데이터 형식으로 문자열로 받을 거라는 의미
 async def create_item(image:UploadFile,
@@ -32,7 +89,7 @@ async def create_item(image:UploadFile,
 #items라는 get 요청이 들어왔을 때
 #Array 형식[1, '식칼팝니다', '잘 잘려요']으로 오는 데이터를 {id:1, title:'식칼팝니다', description:'잘 잘려요'} 객체(object)로 만들어서 FE에 넘겨주기 위한 코드
 @app.get('/items')
-async def get_items():
+async def get_items(user=Depends(manager)):
 	# 컬럼명도 같이 가져옴
     con.row_factory=sqlite3.Row
     
@@ -57,18 +114,5 @@ def get_image(item_id):
     cur = con.cursor()
     image_bytes = cur.execute(f"""SELECT image FROM items WHERE id={item_id}""").fetchone()[0]
     return Response(content=bytes.fromhex(image_bytes))
-
-#회원가입
-@app.post("/signup")
-def signup(id:Annotated[str,Form()],
-           password:Annotated[str,Form()],
-           name:Annotated[str,Form()],
-           phone:Annotated[str,Form()]):
-    cur.execute(f"""
-                INSERT INTO users(id,password,name,phone)
-                VALUES ('{id}','{password}','{name}','{phone}')
-                """)
-    con.commit()
-    return '200'
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
